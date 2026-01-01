@@ -17,7 +17,17 @@ uv run adk web src
 
 # 単一Pythonファイルの実行
 uv run python <file>
+
+# リント & フォーマット
+uv run ruff check .     # リントチェック
+uv run ruff check --fix # 自動修正
+uv run ruff format .    # フォーマット
+
+# pre-commit（初回のみ）
+uv run pre-commit install
 ```
+
+> **Note**: pre-commit hookにより、コミット時に自動でRuffが実行される
 
 ## アーキテクチャ
 
