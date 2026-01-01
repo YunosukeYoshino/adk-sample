@@ -8,7 +8,7 @@ import os
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
 
-from .tools import calculate, get_current_time
+from common.tools import calculate, get_current_time
 
 # 環境変数から設定を読み込み（デフォルト値あり）
 LM_STUDIO_BASE = os.getenv("OPENAI_API_BASE", "http://localhost:1234/v1")

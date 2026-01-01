@@ -24,7 +24,7 @@ wheels = [
 ]
 
 [[package]]
-name = "adk-test"
+name = "adk-sample"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
