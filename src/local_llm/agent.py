@@ -1,9 +1,14 @@
-"""LM Studio（ローカルLLM）を使用するシンプルなエージェント構成."""
+"""LM Studio（ローカルLLM）を使用するエージェント構成。
+
+カスタムツールとA2A統合機能を備えたローカルLLMエージェント。
+"""
 
 import os
 
 from google.adk.agents import Agent
 from google.adk.models.lite_llm import LiteLlm
+
+from .tools import calculate, get_current_time
 
 # 環境変数から設定を読み込み（デフォルト値あり）
 LM_STUDIO_BASE = os.getenv("OPENAI_API_BASE", "http://localhost:1234/v1")
@@ -18,5 +23,15 @@ root_agent = Agent(
         api_key=LM_STUDIO_API_KEY,
     ),
     description="ローカルLLMで動作する汎用AIアシスタント",
-    instruction="あなたは親切で有能なAIアシスタントです。ユーザーの質問に日本語で丁寧に回答してください。",
+    tools=[
+        get_current_time,
+        calculate,
+    ],
+    instruction=(
+        "あなたは親切で有能なAIアシスタントです。"
+        "ユーザーの質問に日本語で丁寧に回答してください。\n\n"
+        "利用可能なツール:\n"
+        "- get_current_time: 現在時刻の取得\n"
+        "- calculate: 数式の計算"
+    ),
 )
