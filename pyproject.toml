@@ -9,6 +9,8 @@ dependencies = [
     "litellm",
     "a2a-sdk",
     "uvicorn",
+    "langchain",
+    "langchain-openai",
 ]
 
 [dependency-groups]

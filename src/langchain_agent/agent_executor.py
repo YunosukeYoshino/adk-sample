@@ -1,38 +1,22 @@
-"""A2A AgentExecutor実装。
+"""A2A AgentExecutor実装（LangChain用）。
 
-ローカルLLMエージェントをA2Aプロトコルで公開するためのExecutor。
+LangChainエージェントをA2Aプロトコルで公開するためのExecutor。
 """
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.types import Task, TaskState, TaskStatus, TaskStatusUpdateEvent
 from a2a.utils.message import new_agent_text_message
-from google.adk.agents import RunConfig
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
 
-from .agent import root_agent
+from .agent import invoke_agent
 
 
-class LocalLLMAgentExecutor(AgentExecutor):
-    """ローカルLLMエージェントのA2A Executor。
+class LangChainA2AExecutor(AgentExecutor):
+    """LangChainエージェントのA2A Executor。
 
-    ADKのRunnerを使用してエージェントを実行し、
+    LangChain 1.0+のcreate_agentを使用してエージェントを実行し、
     A2Aプロトコルでレスポンスを返す。
     """
-
-    def __init__(self) -> None:
-        """Executorを初期化する。"""
-        self.session_service = InMemorySessionService()
-        self.runner = Runner(
-            agent=root_agent,
-            app_name="local-llm-agent",
-            session_service=self.session_service,
-        )
-        self.run_config = RunConfig(
-            max_llm_calls=10,  # 安全性のため呼び出し回数を制限
-        )
 
     async def execute(
         self,
@@ -61,35 +45,11 @@ class LocalLLMAgentExecutor(AgentExecutor):
             )
         )
 
-        # セッション取得または作成
-        user_id = context.context_id or "default-user"
-        session = await self.session_service.get_session(
-            app_name="local-llm-agent",
-            user_id=user_id,
-        )
-        if session is None:
-            session = await self.session_service.create_session(
-                app_name="local-llm-agent",
-                user_id=user_id,
-            )
-
-        # ADKエージェントを実行
-        content = types.Content(
-            role="user",
-            parts=[types.Part.from_text(user_message)],
-        )
-
-        response_text = ""
-        async for event in self.runner.run_async(
-            session_id=session.id,
-            user_id=session.user_id,
-            new_message=content,
-            run_config=self.run_config,
-        ):
-            if hasattr(event, "content") and event.content:
-                for part in event.content.parts:
-                    if hasattr(part, "text") and part.text:
-                        response_text += part.text
+        try:
+            # LangChainエージェントを呼び出し
+            response_text = await invoke_agent(user_message)
+        except Exception as e:
+            response_text = f"エラーが発生しました: {e}"
 
         # 完了タスクを送信
         await event_queue.enqueue_event(
@@ -99,7 +59,7 @@ class LocalLLMAgentExecutor(AgentExecutor):
                 status=TaskStatus(
                     state=TaskState.completed,
                     message=new_agent_text_message(
-                        response_text or "応答を生成できませんでした。",
+                        response_text,
                         context.context_id,
                         context.task_id,
                     ),

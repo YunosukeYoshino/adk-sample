@@ -5,10 +5,14 @@
 [![Gemini](https://img.shields.io/badge/Gemini-2.5_Flash-8E75B2?logo=googlegemini&logoColor=white)](https://deepmind.google/technologies/gemini/)
 [![uv](https://img.shields.io/badge/uv-package_manager-DE5FE9?logo=uv&logoColor=white)](https://docs.astral.sh/uv/)
 [![LiteLLM](https://img.shields.io/badge/LiteLLM-local_LLM-FF6B6B)](https://docs.litellm.ai/)
+[![A2A Protocol](https://img.shields.io/badge/A2A-Protocol-00C853)](https://google.github.io/A2A/)
+[![LangChain](https://img.shields.io/badge/LangChain-1.0+-1C3C3C)](https://python.langchain.com/)
 
 [Google Agent Development Kit (ADK)](https://google.github.io/adk-docs/) を使用したAIエージェント開発のサンプルプロジェクトです。Geminiモデルまたはローカルで動作するLLMを使用した日本語AIアシスタントの実装例を提供します。
 
-[概要](#概要) • [特徴](#特徴) • [セットアップ](#セットアップ) • [使い方](#使い方) • [プロジェクト構成](#プロジェクト構成) • [参考リンク](#参考リンク)
+**A2A（Agent-to-Agent）プロトコル**によるマルチエージェントオーケストレーションもサポートしています。
+
+[概要](#概要) • [特徴](#特徴) • [セットアップ](#セットアップ) • [使い方](#使い方) • [A2Aオーケストレーション](#a2aオーケストレーション) • [プロジェクト構成](#プロジェクト構成) • [参考リンク](#参考リンク)
 
 ## 概要
 
@@ -24,6 +28,9 @@ Google ADK（Agent Development Kit）は、AIエージェントの構築・評�
 - 日本語AIアシスタントのペルソナ設定（星野ミライ）
 - LiteLLMによるローカルLLM対応（LM Studio等）
 - ADK Webインターフェースによる対話的な開発
+- **A2Aプロトコルによるマルチエージェント連携**
+- **LangChainエージェントとのオーケストレーション**
+- カスタムツール（時刻取得、計算、翻訳エージェント呼び出し）
 
 ## 前提条件
 
@@ -86,17 +93,71 @@ uv run adk web src
 | エージェント | 説明 | モデル |
 |:--|:--|:--|
 | `basic` | 星野ミライ - Google検索機能付きAI秘書 | Gemini 2.5 Flash Lite |
-| `local_llm` | ローカルLLM対応の汎用アシスタント | LM Studio経由 |
+| `local_llm` | AIオーケストレーター（A2A対応） | LM Studio経由 |
+| `langchain_agent` | LangChain翻訳エージェント（A2Aサーバー） | LM Studio経由 |
+
+## A2Aオーケストレーション
+
+ADK（local_llm）がオーケストレーターとして、LangChainエージェントをA2Aプロトコルで呼び出すマルチエージェント構成です。
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ADK Web UI (uv run adk web src)                            │
+│  http://127.0.0.1:8000                                      │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  local_llm (オーケストレーター)                       │   │
+│  │  ツール: ask_translator_agent, list_available_agents │   │
+│  └──────────────────────┬──────────────────────────────┘   │
+└─────────────────────────┼───────────────────────────────────┘
+                          │ A2A Protocol (JSON-RPC)
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│  LangChain A2A Server                                       │
+│  PYTHONPATH=src uv run python -m langchain_agent           │
+│  http://localhost:8001                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### A2A連携の起動方法
+
+```bash
+# ターミナル1: LangChainエージェント（A2Aサーバー）を起動
+PYTHONPATH=src uv run python -m langchain_agent
+
+# ターミナル2: ADK Webを起動
+uv run adk web src
+```
+
+1. `http://127.0.0.1:8000` にアクセス
+2. `local_llm` エージェントを選択
+3. 「こんにちはを英語に翻訳して」と入力 → LangChainエージェントに委譲される
 
 ## プロジェクト構成
 
 ```
 adk-sample/
 ├── src/
+│   ├── __init__.py         # srcパッケージ化
+│   ├── common/             # 共通モジュール
+│   │   ├── __init__.py
+│   │   ├── tools.py        # 共通ツール（時刻取得、計算）
+│   │   └── a2a_tools.py    # A2Aクライアントツール
 │   ├── basic/              # Geminiを使用した基本エージェント
+│   │   ├── __init__.py
 │   │   └── agent.py        # 「星野ミライ」エージェント定義
-│   └── local_llm/          # ローカルLLM対応エージェント
-│       └── agent.py        # LiteLLM経由のエージェント定義
+│   ├── local_llm/          # AIオーケストレーター（A2A対応）
+│   │   ├── __init__.py
+│   │   ├── __main__.py     # A2Aサーバー起動
+│   │   ├── agent.py        # オーケストレーターエージェント
+│   │   ├── agent_card.py   # A2A Agent Card
+│   │   └── agent_executor.py # A2A Executor
+│   └── langchain_agent/    # LangChain A2Aエージェント
+│       ├── __init__.py
+│       ├── __main__.py     # A2Aサーバー起動（port:8001）
+│       ├── agent.py        # LangChainエージェント定義
+│       ├── agent_card.py   # A2A Agent Card
+│       └── agent_executor.py # A2A Executor
 ├── docs/
 │   └── PLAN.md             # 機能拡張計画
 ├── pyproject.toml          # プロジェクト設定
@@ -147,3 +208,5 @@ uv run pre-commit install
 - [LiteLLM](https://docs.litellm.ai/) - 100以上のLLMプロバイダーへの統一インターフェース
 - [LM Studio](https://lmstudio.ai/) - ローカルLLM実行環境
 - [uv](https://docs.astral.sh/uv/) - 高速Pythonパッケージマネージャー
+- [A2A Protocol](https://google.github.io/A2A/) - エージェント間通信プロトコル
+- [LangChain](https://python.langchain.com/) - LLMアプリケーション開発フレームワーク
